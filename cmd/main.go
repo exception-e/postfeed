@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"postfeed/internal/config"
 	"postfeed/internal/graph"
 	"postfeed/internal/logger"
@@ -17,6 +19,7 @@ import (
 	"postfeed/internal/storage/inmemory"
 	"postfeed/internal/storage/psql"
 	storageTypes "postfeed/internal/storage/types"
+	"syscall"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -26,7 +29,10 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-const defaultPort = "8080"
+const (
+	defaultPort     = "8080"
+	shutdownTimeout = 5 * time.Second
+)
 
 func main() {
 	var logHandler = slog.NewJSONHandler(os.Stdout, nil)
@@ -34,7 +40,7 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Error("Failed to config.Load: %v", err)
+		log.Error("Failed to config.Load", "error", err)
 		os.Exit(1)
 	}
 
@@ -44,13 +50,13 @@ func main() {
 	case config.StorageTypePSQL:
 		db, err := initDB(cfg.Storage)
 		if err != nil {
-			log.Error("Failed to initDB: %v", err)
+			log.Error("Failed to initDB", "error", err)
 			os.Exit(1)
 		}
 
 		storage := psql.NewStorage(db, log.WithGroup("psql"))
 		if err = storage.RunMigrations(); err != nil {
-			log.Error("Failed to storage.RunMigrations: %v", err)
+			log.Error("Failed to storage.RunMigrations", "error", err)
 			os.Exit(1)
 		}
 
@@ -61,14 +67,14 @@ func main() {
 
 		postsRepo, commentsRepo = postsStorage, commentsStorage
 	default:
-		log.Error("Unsupported storage type: %s", cfg.StorageType)
+		log.Error("Unsupported storage type", "type", cfg.StorageType)
 		os.Exit(1)
 	}
 
 	postsService := posts.NewService(postsRepo)
 	commentsService := comments.NewService(postsService, commentsRepo)
 
-	srv := handler.New(
+	gqpSrv := handler.New(
 		graph.NewExecutableSchema(
 			graph.Config{
 				Resolvers: &graph.Resolver{
@@ -79,36 +85,57 @@ func main() {
 		),
 	)
 
-	srv.AddTransport(transport.Options{})
-	srv.AddTransport(transport.GET{})
-	srv.AddTransport(transport.POST{})
+	gqpSrv.AddTransport(transport.Options{})
+	gqpSrv.AddTransport(transport.GET{})
+	gqpSrv.AddTransport(transport.POST{})
+	gqpSrv.Use(extension.Introspection{})
 
-	//srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
-
-	srv.Use(extension.Introspection{})
-	//srv.Use(extension.AutomaticPersistedQuery{
-	//	Cache: lru.New[string](100),
-	//})
-
-	http.Handle(
+	srvMux := http.NewServeMux()
+	srvMux.Handle(
 		"/",
 		playground.Handler("GraphQL playground", "/query"),
 	)
-	http.Handle(
+	srvMux.Handle(
 		"/query",
 		middleware.Logger(
 			middleware.RequestID(
 				auth.AuthMiddleware(
-					loader.Middleware(commentsRepo, srv),
+					loader.Middleware(commentsRepo, gqpSrv),
 				),
 			),
 		),
 	)
 
-	srvErr := http.ListenAndServe(":"+defaultPort, nil)
-	if srvErr != nil {
-		log.Error("Running server:", srvErr.Error())
-		os.Exit(1)
+	srv := &http.Server{
+		Addr:              ":" + defaultPort,
+		Handler:           srvMux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	signalCtx, signalCtxCancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer signalCtxCancel()
+
+	go func() {
+		log.Info("HTTP server started", "address", srv.Addr)
+
+		err := srv.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			return
+		}
+		log.Error("HTTP server error:", "error", err)
+	}()
+
+	<-signalCtx.Done()
+	log.Info("Shutting HTTP server down...")
+
+	shutdownCtx, shutdownCtxCancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer shutdownCtxCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Error("HTTP server shutdown failed", "error", err)
 	}
 }
 

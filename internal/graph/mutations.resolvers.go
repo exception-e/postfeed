@@ -43,23 +43,6 @@ func (r *mutationResolver) SetPostCommentsEnabled(ctx context.Context, postID uu
 		return nil, toGQLError(err)
 	}
 
-	//if err != nil {
-	//	switch {
-	//	case errors.Is(err, postsServiceTypes.ErrPostNotFound):
-	//		return nil, toGQLError(
-	//			"Non-existing Post",
-	//			"NOT_FOUND",
-	//		)
-	//	case errors.Is(err, postsServiceTypes.ErrUnauthorized):
-	//		return nil, gqlError(
-	//			"Post author does not match the requester",
-	//			"NOT_AUTHORIZED",
-	//		)
-	//	default:
-	//		return nil, fmt.Errorf("r.PostsService.UpdatePost: %w", err)
-	//	}
-	//}
-
 	post, err := r.PostsService.GetPost(ctx, postID)
 	if err != nil {
 		return nil, toGQLError(fmt.Errorf("r.PostsService.GetPost: %w", err))
