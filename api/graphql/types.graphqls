@@ -1,0 +1,52 @@
+type Post {
+    id: UUID!
+    userId: UUID!
+
+    body: String!
+    commentsEnabled: Boolean!
+
+    createdAt: DateTime!
+    updatedAt: DateTime!
+
+    """
+    Только корневые комментарии поста.
+    Пагинация не пытается выгрузить всё дерево.
+    """
+    comments(first: Int = 20, after: Cursor): CommentConnection!
+}
+
+type PostConnection {
+    nodes: [Post!]!
+    nextCursor: Cursor
+    totalCount: Int!
+}
+
+type Comment {
+    id: UUID!
+    postId: UUID!
+    parentId: UUID
+
+    userId: UUID!
+    body: String!
+
+    createdAt: DateTime!
+
+    """
+    Дочерние комментарии конкретного узла.
+    Поддерживает сколько угодно уровней:
+    comment.replies.edges.node.replies...
+    """
+    replies(first: Int = 20, after: Cursor): CommentConnection!
+
+    """
+    Может читаться из агрегированного поля child_count,
+    чтобы UI мог показать «Показать ещё N ответов».
+    """
+    repliesCount: Int!
+}
+
+type CommentConnection {
+    nodes: [Comment!]!
+    nextCursor: Cursor
+    totalCount: Int!
+}

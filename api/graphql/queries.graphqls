@@ -1,0 +1,11 @@
+type Query {
+    """
+    Список постов, отсортированный от новых к старым.
+    """
+    posts(first: Int = 20, after: Cursor): PostConnection!
+
+    """
+    Возвращает null, если поста не существует.
+    """
+    post(id: UUID!): Post
+}

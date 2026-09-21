@@ -1,0 +1,27 @@
+type Mutation {
+  createPost(input: CreatePostInput!): Post!
+
+  """
+  Доступно только автору поста.
+  """
+  setPostCommentsEnabled(
+    postId: UUID!
+    enabled: Boolean!
+  ): Post!
+
+  """
+  Создаёт корневой комментарий либо ответ, если parentId указан.
+  """
+  createComment(input: CreateCommentInput!): Comment!
+}
+
+input CreatePostInput {
+  body: String!
+  commentsEnabled: Boolean = true
+}
+
+input CreateCommentInput {
+  postId: UUID!
+  parentId: UUID
+  body: String!
+}
