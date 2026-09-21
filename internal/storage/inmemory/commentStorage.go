@@ -180,9 +180,116 @@ func (s *CommentStorage) ListComments(ctx context.Context, cursor domain.Cursor,
 }
 
 func (s *CommentStorage) ListFirstComments(ctx context.Context, first int64, postIDs []uuid.UUID) ([]domain.Comment, error) {
-	return nil, nil
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if first <= 0 {
+		return nil, fmt.Errorf("first must be GT 0")
+	}
+	if len(postIDs) == 0 {
+		return nil, fmt.Errorf("post ids must be provided")
+	}
+
+	postIDsFilter := make(map[uuid.UUID]struct{}, len(postIDs))
+	for _, id := range postIDs {
+		postIDsFilter[id] = struct{}{}
+	}
+
+	s.mu.RLock()
+	all := make([]domain.Comment, 0, len(s.comments))
+	for _, c := range s.comments {
+		if _, ok := postIDsFilter[c.PostID]; !ok {
+			continue
+		}
+		if c.ParentID.Valid {
+			continue
+		}
+		all = append(all, c)
+	}
+	s.mu.RUnlock()
+
+	slices.SortFunc(all, func(a, b domain.Comment) int {
+		if cmp := bytes.Compare(a.PostID[:], b.PostID[:]); cmp != 0 {
+			return cmp
+		}
+		return bytes.Compare(a.ID[:], b.ID[:])
+	})
+
+	comments := make([]domain.Comment, 0, first*int64(len(postIDs)))
+	var (
+		prevPostID uuid.UUID
+		count      int64
+		firstIter  = true
+	)
+	for _, c := range all {
+		if firstIter || c.PostID != prevPostID {
+			prevPostID = c.PostID
+			count = 0
+			firstIter = false
+		}
+		if count >= first {
+			continue
+		}
+		comments = append(comments, c)
+		count++
+	}
+
+	return comments, nil
 }
 
 func (s *CommentStorage) ListFirstReplies(ctx context.Context, first int64, parentIDs []uuid.UUID) ([]domain.Comment, error) {
-	return nil, nil
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if first <= 0 {
+		return nil, fmt.Errorf("first must be GT 0")
+	}
+	if len(parentIDs) == 0 {
+		return nil, fmt.Errorf("parent ids must be provided")
+	}
+
+	parentIDsFilter := make(map[uuid.UUID]struct{}, len(parentIDs))
+	for _, id := range parentIDs {
+		parentIDsFilter[id] = struct{}{}
+	}
+
+	s.mu.RLock()
+	all := make([]domain.Comment, 0, len(s.comments))
+	for _, c := range s.comments {
+		if !c.ParentID.Valid {
+			continue
+		}
+		if _, ok := parentIDsFilter[c.ParentID.UUID]; !ok {
+			continue
+		}
+		all = append(all, c)
+	}
+	s.mu.RUnlock()
+
+	slices.SortFunc(all, func(a, b domain.Comment) int {
+		if cmp := bytes.Compare(a.ParentID.UUID[:], b.ParentID.UUID[:]); cmp != 0 {
+			return cmp
+		}
+		return bytes.Compare(a.ID[:], b.ID[:])
+	})
+
+	comments := make([]domain.Comment, 0, first*int64(len(parentIDs)))
+	var (
+		prevParentID uuid.UUID
+		count        int64
+		firstIter    = true
+	)
+	for _, c := range all {
+		if firstIter || c.ParentID.UUID != prevParentID {
+			prevParentID = c.ParentID.UUID
+			count = 0
+			firstIter = false
+		}
+		if count >= first {
+			continue
+		}
+		comments = append(comments, c)
+		count++
+	}
+	return comments, nil
 }

@@ -161,7 +161,7 @@ func (s *Storage) ListFirstComments(ctx context.Context, first int64, postIDs []
 	if first <= 0 {
 		return nil, fmt.Errorf("first must be GT 0")
 	}
-	if len(postIDs) <= 0 {
+	if len(postIDs) == 0 {
 		return nil, fmt.Errorf("post ids must be provided")
 	}
 
@@ -229,8 +229,8 @@ func (s *Storage) ListFirstReplies(ctx context.Context, first int64, parentIDs [
 	if first <= 0 {
 		return nil, fmt.Errorf("first must be GT 0")
 	}
-	if len(parentIDs) <= 0 {
-		return nil, fmt.Errorf("post ids must be provided")
+	if len(parentIDs) == 0 {
+		return nil, fmt.Errorf("parent ids must be provided")
 	}
 
 	args := []any{first, pq.Array(parentIDs)}
@@ -260,12 +260,12 @@ SELECT
     created_at
 FROM numbered_comments
 WHERE rn <= $1
-ORDER BY post_id, id;
+ORDER BY parent_id, id;
 	`
 
 	rows, err := s.db.QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
-		return nil, fmt.Errorf("listing comments: %w", err)
+		return nil, fmt.Errorf("listing replies: %w", err)
 	}
 	defer rows.Close()
 
@@ -281,12 +281,12 @@ ORDER BY post_id, id;
 			&comment.CreatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("listing comments: rows.Scan: %w", err)
+			return nil, fmt.Errorf("listing replies: rows.Scan: %w", err)
 		}
 		comments = append(comments, comment)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("listing comments: rows.Err: %w", err)
+		return nil, fmt.Errorf("listing replies: rows.Err: %w", err)
 	}
 
 	return comments, nil

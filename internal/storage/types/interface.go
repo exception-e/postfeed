@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
+//go:generate	mockgen -source=./internal/storage/types/interface.go -destination=./internal/services/mocks/mockStorage.go -package=mocks
+
 type PostRepo interface {
 	CreatePost(ctx context.Context, post domain.Post) (uuid.UUID, error)
 	UpdatePost(ctx context.Context, input PostUpdateInput) error
