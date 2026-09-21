@@ -11,6 +11,7 @@ import (
 	"postfeed/internal/domain"
 	"postfeed/internal/graph/model"
 	commentsServiceTypes "postfeed/internal/services/comments/types"
+	"postfeed/internal/services/loader"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,6 +29,20 @@ func (r *commentResolver) ParentID(ctx context.Context, obj *domain.Comment) (*u
 // CreatedAt is the resolver for the createdAt field.
 func (r *commentResolver) CreatedAt(ctx context.Context, obj *domain.Comment) (string, error) {
 	return obj.CreatedAt.Format(time.RFC3339), nil
+}
+
+// FirstReplies is the resolver for the firstReplies field.
+func (r *commentResolver) FirstReplies(ctx context.Context, obj *domain.Comment) (*model.CommentConnection, error) {
+	comments, err := loader.For(ctx).FirstReplies.Load(ctx, obj.ID)
+	if err != nil {
+		return nil, fmt.Errorf("loader.For(ctx).FirstReplies.Load: %w", err)
+	}
+
+	return &model.CommentConnection{
+		Nodes:      comments,
+		NextCursor: nil,
+		TotalCount: 0,
+	}, nil
 }
 
 // Replies is the resolver for the replies field.
@@ -67,6 +82,20 @@ func (r *postResolver) CreatedAt(ctx context.Context, obj *domain.Post) (string,
 // UpdatedAt is the resolver for the updatedAt field.
 func (r *postResolver) UpdatedAt(ctx context.Context, obj *domain.Post) (string, error) {
 	return obj.UpdatedAt.Format(time.RFC3339), nil
+}
+
+// FirstComments is the resolver for the firstComments field.
+func (r *postResolver) FirstComments(ctx context.Context, obj *domain.Post) (*model.CommentConnection, error) {
+	comments, err := loader.For(ctx).FirstComments.Load(ctx, obj.ID)
+	if err != nil {
+		return nil, fmt.Errorf("loader.For(ctx).FirstComments.Load: %w", err)
+	}
+
+	return &model.CommentConnection{
+		Nodes:      comments,
+		NextCursor: nil,
+		TotalCount: 0,
+	}, nil
 }
 
 // Comments is the resolver for the comments field.

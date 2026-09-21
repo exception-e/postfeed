@@ -43,6 +43,7 @@ type ComplexityRoot struct {
 	Comment struct {
 		Body         func(childComplexity int) int
 		CreatedAt    func(childComplexity int) int
+		FirstReplies func(childComplexity int) int
 		ID           func(childComplexity int) int
 		ParentID     func(childComplexity int) int
 		PostID       func(childComplexity int) int
@@ -68,6 +69,7 @@ type ComplexityRoot struct {
 		Comments        func(childComplexity int, first *int32, after *uuid.UUID) int
 		CommentsEnabled func(childComplexity int) int
 		CreatedAt       func(childComplexity int) int
+		FirstComments   func(childComplexity int) int
 		ID              func(childComplexity int) int
 		UpdatedAt       func(childComplexity int) int
 		UserID          func(childComplexity int) int
@@ -93,6 +95,7 @@ type CommentResolver interface {
 	ParentID(ctx context.Context, obj *domain.Comment) (*uuid.UUID, error)
 
 	CreatedAt(ctx context.Context, obj *domain.Comment) (string, error)
+	FirstReplies(ctx context.Context, obj *domain.Comment) (*model.CommentConnection, error)
 	Replies(ctx context.Context, obj *domain.Comment, first *int32, after *uuid.UUID) (*model.CommentConnection, error)
 	RepliesCount(ctx context.Context, obj *domain.Comment) (int32, error)
 }
@@ -104,6 +107,7 @@ type MutationResolver interface {
 type PostResolver interface {
 	CreatedAt(ctx context.Context, obj *domain.Post) (string, error)
 	UpdatedAt(ctx context.Context, obj *domain.Post) (string, error)
+	FirstComments(ctx context.Context, obj *domain.Post) (*model.CommentConnection, error)
 	Comments(ctx context.Context, obj *domain.Post, first *int32, after *uuid.UUID) (*model.CommentConnection, error)
 }
 type QueryResolver interface {
@@ -141,6 +145,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Comment.CreatedAt(childComplexity), true
+	case "Comment.firstReplies":
+		if e.ComplexityRoot.Comment.FirstReplies == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Comment.FirstReplies(childComplexity), true
 	case "Comment.id":
 		if e.ComplexityRoot.Comment.ID == nil {
 			break
@@ -265,6 +275,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Post.CreatedAt(childComplexity), true
+	case "Post.firstComments":
+		if e.ComplexityRoot.Post.FirstComments == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Post.FirstComments(childComplexity), true
 	case "Post.id":
 		if e.ComplexityRoot.Post.ID == nil {
 			break
@@ -464,6 +480,10 @@ scalar UUID`, BuiltIn: false},
     updatedAt: DateTime!
 
     """
+    Только первые 30 корневых комментариев поста.
+    """
+    firstComments: CommentConnection!
+    """
     Только корневые комментарии поста.
     Пагинация не пытается выгрузить всё дерево.
     """
@@ -486,6 +506,10 @@ type Comment {
 
     createdAt: DateTime!
 
+    """
+    Только первые 30 дочерних ответов на комментарий.
+    """
+    firstReplies: CommentConnection!
     """
     Дочерние комментарии конкретного узла.
     Поддерживает сколько угодно уровней:
@@ -527,6 +551,8 @@ func (ec *executionContext) childFields_Comment(ctx context.Context, field graph
 		return ec.fieldContext_Comment_body(ctx, field)
 	case "createdAt":
 		return ec.fieldContext_Comment_createdAt(ctx, field)
+	case "firstReplies":
+		return ec.fieldContext_Comment_firstReplies(ctx, field)
 	case "replies":
 		return ec.fieldContext_Comment_replies(ctx, field)
 	case "repliesCount":
@@ -561,6 +587,8 @@ func (ec *executionContext) childFields_Post(ctx context.Context, field graphql.
 		return ec.fieldContext_Post_createdAt(ctx, field)
 	case "updatedAt":
 		return ec.fieldContext_Post_updatedAt(ctx, field)
+	case "firstComments":
+		return ec.fieldContext_Post_firstComments(ctx, field)
 	case "comments":
 		return ec.fieldContext_Post_comments(ctx, field)
 	}
@@ -1037,6 +1065,38 @@ func (ec *executionContext) fieldContext_Comment_createdAt(_ context.Context, fi
 	return graphql.NewScalarFieldContext("Comment", field, true, true, errors.New("field of type DateTime does not have child fields"))
 }
 
+func (ec *executionContext) _Comment_firstReplies(ctx context.Context, field graphql.CollectedField, obj *domain.Comment) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Comment_firstReplies(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Comment().FirstReplies(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.CommentConnection) graphql.Marshaler {
+			return ec.marshalNCommentConnection2ᚖpostfeedᚋinternalᚋgraphᚋmodelᚐCommentConnection(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Comment_firstReplies(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Comment",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CommentConnection(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Comment_replies(ctx context.Context, field graphql.CollectedField, obj *domain.Comment) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1450,6 +1510,38 @@ func (ec *executionContext) _Post_updatedAt(ctx context.Context, field graphql.C
 }
 func (ec *executionContext) fieldContext_Post_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Post", field, true, true, errors.New("field of type DateTime does not have child fields"))
+}
+
+func (ec *executionContext) _Post_firstComments(ctx context.Context, field graphql.CollectedField, obj *domain.Post) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Post_firstComments(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Post().FirstComments(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.CommentConnection) graphql.Marshaler {
+			return ec.marshalNCommentConnection2ᚖpostfeedᚋinternalᚋgraphᚋmodelᚐCommentConnection(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Post_firstComments(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Post",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CommentConnection(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _Post_comments(ctx context.Context, field graphql.CollectedField, obj *domain.Post) (ret graphql.Marshaler) {
@@ -2998,6 +3090,44 @@ func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, 
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "firstReplies":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Comment_firstReplies(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "replies":
 			field := field
 
@@ -3285,6 +3415,44 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 					}
 				}()
 				res = ec._Post_updatedAt(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "firstComments":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Post_firstComments(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}

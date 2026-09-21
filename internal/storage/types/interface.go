@@ -16,4 +16,6 @@ type PostRepo interface {
 type CommentRepo interface {
 	CreateComment(ctx context.Context, comment domain.Comment) (uuid.UUID, error)
 	ListComments(ctx context.Context, cursor domain.Cursor, input CommentListInput) ([]domain.Comment, domain.Cursor, error)
+	ListFirstComments(ctx context.Context, first int64, postIDs []uuid.UUID) ([]domain.Comment, error)
+	ListFirstReplies(ctx context.Context, first int64, parentIDs []uuid.UUID) ([]domain.Comment, error)
 }

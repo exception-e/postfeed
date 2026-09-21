@@ -157,16 +157,15 @@ func (s *Storage) ListComments(ctx context.Context, cursor domain.Cursor, input 
 	return comments, cursorNext, nil
 }
 
-func (s *Storage) ListRootComments(ctx context.Context, cursor domain.Cursor, postIDs []uuid.UUID) ([]domain.Comment, error) {
-	if cursor.Limit <= 0 {
-		return nil, fmt.Errorf("limit must be GT 0")
+func (s *Storage) ListFirstComments(ctx context.Context, first int64, postIDs []uuid.UUID) ([]domain.Comment, error) {
+	if first <= 0 {
+		return nil, fmt.Errorf("first must be GT 0")
 	}
 	if len(postIDs) <= 0 {
 		return nil, fmt.Errorf("post ids must be provided")
 	}
 
-	args := []any{cursor.Limit}
-	args = append(args, postIDs)
+	args := []any{first, pq.Array(postIDs)}
 
 	sqlQuery := `
 	WITH numbered_comments AS (
@@ -182,19 +181,19 @@ func (s *Storage) ListRootComments(ctx context.Context, cursor domain.Cursor, po
             ORDER BY c.id ASC
         ) AS rn
     FROM comments c
-    WHERE c.post_id = ANY (:$2::uuid[])
+    WHERE c.post_id = ANY ($2::uuid[])
       AND c.parent_id IS NULL
-)
-SELECT
-    id,
-    user_id,
-    post_id,
-    parent_id,
-    body,
-    created_at
-FROM numbered_comments
-WHERE rn <= :$1
-ORDER BY post_id, id;
+	)
+	SELECT
+    	id,
+    	user_id,
+    	post_id,
+    	parent_id,
+    	body,
+    	created_at
+	FROM numbered_comments
+	WHERE rn <= $1
+	ORDER BY post_id, id;
 	`
 
 	rows, err := s.db.QueryContext(ctx, sqlQuery, args...)
@@ -203,7 +202,7 @@ ORDER BY post_id, id;
 	}
 	defer rows.Close()
 
-	comments := make([]domain.Comment, 0, cursor.Limit)
+	comments := make([]domain.Comment, 0, first)
 	for rows.Next() {
 		comment := domain.Comment{}
 		err := rows.Scan(
@@ -226,16 +225,15 @@ ORDER BY post_id, id;
 	return comments, nil
 }
 
-func (s *Storage) ListFirstReplies(ctx context.Context, cursor domain.Cursor, parentIDs []uuid.UUID) ([]domain.Comment, error) {
-	if cursor.Limit <= 0 {
-		return nil, fmt.Errorf("limit must be GT 0")
+func (s *Storage) ListFirstReplies(ctx context.Context, first int64, parentIDs []uuid.UUID) ([]domain.Comment, error) {
+	if first <= 0 {
+		return nil, fmt.Errorf("first must be GT 0")
 	}
 	if len(parentIDs) <= 0 {
 		return nil, fmt.Errorf("post ids must be provided")
 	}
 
-	args := []any{cursor.Limit}
-	args = append(args, parentIDs)
+	args := []any{first, pq.Array(parentIDs)}
 
 	sqlQuery := `
 	WITH numbered_comments AS (
@@ -251,7 +249,7 @@ func (s *Storage) ListFirstReplies(ctx context.Context, cursor domain.Cursor, pa
             ORDER BY c.id ASC
         ) AS rn
     FROM comments c
-    WHERE c.parent_id = ANY (:$2::uuid[])
+    WHERE c.parent_id = ANY ($2::uuid[])
 )
 SELECT
     id,
@@ -261,7 +259,7 @@ SELECT
     body,
     created_at
 FROM numbered_comments
-WHERE rn <= :$1
+WHERE rn <= $1
 ORDER BY post_id, id;
 	`
 
@@ -271,7 +269,7 @@ ORDER BY post_id, id;
 	}
 	defer rows.Close()
 
-	comments := make([]domain.Comment, 0, cursor.Limit)
+	comments := make([]domain.Comment, 0, first)
 	for rows.Next() {
 		comment := domain.Comment{}
 		err := rows.Scan(

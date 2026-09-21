@@ -12,6 +12,7 @@ import (
 	"postfeed/internal/logger"
 	"postfeed/internal/services/auth"
 	"postfeed/internal/services/comments"
+	"postfeed/internal/services/loader"
 	"postfeed/internal/services/posts"
 	"postfeed/internal/storage/inmemory"
 	"postfeed/internal/storage/psql"
@@ -98,7 +99,7 @@ func main() {
 		middleware.Logger(
 			middleware.RequestID(
 				auth.AuthMiddleware(
-					srv,
+					loader.Middleware(commentsRepo, srv),
 				),
 			),
 		),

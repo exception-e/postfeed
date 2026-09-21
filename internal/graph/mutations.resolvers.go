@@ -19,7 +19,6 @@ import (
 
 // CreatePost is the resolver for the createPost field.
 func (r *mutationResolver) CreatePost(ctx context.Context, input model.CreatePostInput) (*domain.Post, error) {
-
 	postID, err := r.PostsService.CreatePost(ctx, postsServiceTypes.CreatePostInput{
 		UserID:          auth.UserIDFromCtx(ctx),
 		Body:            input.Body,

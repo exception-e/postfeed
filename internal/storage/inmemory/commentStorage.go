@@ -178,3 +178,11 @@ func (s *CommentStorage) ListComments(ctx context.Context, cursor domain.Cursor,
 
 	return comments, cursorNext, nil
 }
+
+func (s *CommentStorage) ListFirstComments(ctx context.Context, first int64, postIDs []uuid.UUID) ([]domain.Comment, error) {
+	return nil, nil
+}
+
+func (s *CommentStorage) ListFirstReplies(ctx context.Context, first int64, parentIDs []uuid.UUID) ([]domain.Comment, error) {
+	return nil, nil
+}
