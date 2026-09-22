@@ -36,17 +36,17 @@ func toGQLError(err error) error {
 		}
 	case errors.Is(err, commentsServiceTypes.ErrCommentsDisabled):
 		return &gqlerror.Error{
-			Message:    "body is too long",
+			Message:    "post comments are disabled",
 			Extensions: map[string]any{"code": CodeCommentsDisabled},
 		}
 	case errors.Is(err, commentsServiceTypes.ErrCommentNotFound):
 		return &gqlerror.Error{
-			Message:    "body is too long",
+			Message:    "comment not found",
 			Extensions: map[string]any{"code": CodeNotFound},
 		}
 	case errors.Is(err, commentsServiceTypes.ErrPostNotFound):
 		return &gqlerror.Error{
-			Message:    "body is too long",
+			Message:    "post not found",
 			Extensions: map[string]any{"code": CodeNotFound},
 		}
 	default:

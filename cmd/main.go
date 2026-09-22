@@ -12,6 +12,7 @@ import (
 	"postfeed/internal/config"
 	"postfeed/internal/graph"
 	"postfeed/internal/logger"
+	"postfeed/internal/pubsub"
 	"postfeed/internal/services/auth"
 	"postfeed/internal/services/comments"
 	"postfeed/internal/services/loader"
@@ -26,6 +27,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
@@ -35,7 +37,10 @@ const (
 )
 
 func main() {
-	var logHandler = slog.NewJSONHandler(os.Stdout, nil)
+	logHandler := slog.NewJSONHandler(
+		os.Stdout,
+		&slog.HandlerOptions{Level: slog.LevelDebug},
+	)
 	log := logger.New(logHandler)
 
 	cfg, err := config.Load()
@@ -73,6 +78,7 @@ func main() {
 
 	postsService := posts.NewService(postsRepo)
 	commentsService := comments.NewService(postsService, commentsRepo)
+	pubsubService := pubsub.NewMemory(log.WithGroup("pubsub"))
 
 	gqpSrv := handler.New(
 		graph.NewExecutableSchema(
@@ -80,6 +86,7 @@ func main() {
 				Resolvers: &graph.Resolver{
 					PostsService:    postsService,
 					CommentsService: commentsService,
+					PubSub:          pubsubService,
 				},
 			},
 		),
@@ -88,7 +95,23 @@ func main() {
 	gqpSrv.AddTransport(transport.Options{})
 	gqpSrv.AddTransport(transport.GET{})
 	gqpSrv.AddTransport(transport.POST{})
-	gqpSrv.AddTransport(&transport.Websocket{})
+	gqpSrv.AddTransport(&transport.Websocket{
+		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
+			payload := map[string]any(initPayload)
+
+			userID, ok := auth.ParseUserIDFromInitPayload(payload)
+			if !ok {
+				return ctx, nil, errors.New("userID must be provided in connection_init")
+			}
+
+			return auth.WithUserID(ctx, userID), nil, nil
+		},
+		Implementation: transport.CoderWebsocketImplementation{
+			AcceptOptions: websocket.AcceptOptions{
+				OriginPatterns: []string{"https://example.org"},
+			},
+		},
+	})
 	gqpSrv.Use(extension.Introspection{})
 
 	srvMux := http.NewServeMux()

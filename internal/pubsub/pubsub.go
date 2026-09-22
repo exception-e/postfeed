@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"log/slog"
 	"postfeed/internal/domain"
 	"postfeed/internal/pubsub/types"
 
@@ -16,12 +17,14 @@ type PubSub struct {
 	mu          sync.RWMutex
 	subscribers map[uuid.UUID]map[chan *domain.Comment]struct{}
 	bufSize     int
+	log         *slog.Logger
 }
 
-func NewMemory() types.PubSub {
+func NewMemory(log *slog.Logger) types.PubSub {
 	return &PubSub{
 		subscribers: make(map[uuid.UUID]map[chan *domain.Comment]struct{}),
 		bufSize:     bufSize,
+		log:         log,
 	}
 }
 
@@ -52,6 +55,8 @@ func (ps *PubSub) Subscribe(ctx context.Context, postID uuid.UUID) (<-chan *doma
 			delete(ps.subscribers, postID)
 		}
 	}
+	ps.log.Debug("Comment subscription added", "postID", postID)
+
 	return ch, unsubscribe
 }
 
@@ -62,7 +67,9 @@ func (ps *PubSub) Publish(ctx context.Context, postID uuid.UUID, comment *domain
 	for ch := range ps.subscribers[postID] {
 		select {
 		case ch <- comment:
+			ps.log.Debug("Comment publish done", "postID", comment.PostID)
 		default:
+			ps.log.Debug("Comment publish skipped", "postID", comment.PostID)
 		}
 	}
 }

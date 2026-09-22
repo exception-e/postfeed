@@ -67,25 +67,6 @@ func (r *mutationResolver) CreateComment(ctx context.Context, input model.Create
 	})
 	if err != nil {
 		return nil, toGQLError(err)
-		//switch {
-		//case errors.Is(err, commentsServiceTypes.ErrPostNotFound):
-		//	return nil, gqlError(
-		//		"Non-existing Post",
-		//		"NOT_FOUND",
-		//	)
-		//case errors.Is(err, commentsServiceTypes.ErrCommentNotFound):
-		//	return nil, gqlError(
-		//		"Non-existing parent Comment",
-		//		"NOT_FOUND",
-		//	)
-		//case errors.Is(err, commentsServiceTypes.ErrCommentsDisabled):
-		//	return nil, gqlError(
-		//		"Post commenting is disabled",
-		//		"OPERATION_NOT_PERMITTED",
-		//	)
-		//default:
-		//	return nil, fmt.Errorf("r.CommentsService.CreateComment: %w", err)
-		//}
 	}
 
 	comment, err := r.CommentsService.GetComment(ctx, id)
@@ -94,6 +75,7 @@ func (r *mutationResolver) CreateComment(ctx context.Context, input model.Create
 	}
 
 	r.PubSub.Publish(ctx, comment.PostID, comment)
+
 	return comment, nil
 }
 
