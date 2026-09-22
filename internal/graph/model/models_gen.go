@@ -36,3 +36,6 @@ type PostConnection struct {
 
 type Query struct {
 }
+
+type Subscription struct {
+}

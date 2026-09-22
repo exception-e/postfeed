@@ -93,6 +93,7 @@ func (r *mutationResolver) CreateComment(ctx context.Context, input model.Create
 		return nil, toGQLError(fmt.Errorf("r.CommentsService.CreateComment: %w", err))
 	}
 
+	r.PubSub.Publish(ctx, comment.PostID, comment)
 	return comment, nil
 }
 

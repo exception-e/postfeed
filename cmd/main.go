@@ -88,6 +88,7 @@ func main() {
 	gqpSrv.AddTransport(transport.Options{})
 	gqpSrv.AddTransport(transport.GET{})
 	gqpSrv.AddTransport(transport.POST{})
+	gqpSrv.AddTransport(&transport.Websocket{})
 	gqpSrv.Use(extension.Introspection{})
 
 	srvMux := http.NewServeMux()

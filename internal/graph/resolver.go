@@ -6,6 +6,7 @@ package graph
 // here.
 
 import (
+	pubsubTypes "postfeed/internal/pubsub/types"
 	commentsServiceTypes "postfeed/internal/services/comments/types"
 	postsServiceTypes "postfeed/internal/services/posts/types"
 )
@@ -13,4 +14,5 @@ import (
 type Resolver struct {
 	PostsService    postsServiceTypes.PostsService
 	CommentsService commentsServiceTypes.CommentsService
+	PubSub          pubsubTypes.PubSub
 }
