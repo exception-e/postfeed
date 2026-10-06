@@ -29,10 +29,10 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/joho/godotenv"
 )
 
 const (
-	defaultPort     = "8080"
 	shutdownTimeout = 5 * time.Second
 )
 
@@ -43,6 +43,9 @@ func main() {
 	)
 	log := logger.New(logHandler)
 
+	if err := godotenv.Load(); err != nil {
+		log.Info("No .env, use provided environment variables")
+	}
 	cfg, err := config.Load()
 	if err != nil {
 		log.Error("Failed to config.Load", "error", err)
@@ -131,7 +134,7 @@ func main() {
 	)
 
 	srv := &http.Server{
-		Addr:              ":" + defaultPort,
+		Addr:              ":" + os.Getenv("APP_PORT"),
 		Handler:           srvMux,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
@@ -164,7 +167,9 @@ func main() {
 }
 
 func initDB(cfg psql.Config) (*sql.DB, error) {
-	db, err := sql.Open("postgres", cfg.DSN)
+	var err error
+	var db *sql.DB
+	db, err = sql.Open("postgres", cfg.DSN)
 	if err != nil {
 		return nil, err
 	}

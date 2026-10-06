@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS posts (
     body text NOT NULL,
     comments_enabled boolean NOT NULL DEFAULT true,
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now());
+
 
 CREATE TABLE IF NOT EXISTS comments (
     id uuid PRIMARY KEY DEFAULT uuidv7(),

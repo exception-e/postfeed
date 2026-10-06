@@ -1,7 +1,7 @@
 # PostFeed
 
 Мини-сервис для постов и комментариев с поддержкой двух хранилищ:
-**in-memory** и **PostgreSQL**. Выбор хранилища управляется переменной окружения
+in-memory и PostgreSQL. Выбор хранилища управляется переменной окружения
 `STORAGE_TYPE`.
 
 ## Стек
@@ -15,7 +15,7 @@
 API позволяет получать posts и первые root comments для каждого поста.
 Reply-комментарии не входят в выдачу comments: root comment — это комментарий с parent_id = null.
 
-Комментарии упорядочены по id ASC. В качестве id используется UUIDv7, поэтому такой порядок соответствует порядку создания с практической точностью.
+Комментарии упорядочены по id ASC. В качестве id используется UUIDv7, такой порядок, с некоторым приближением, соответствует порядку создания.
 
 Для устранения N+1 запросов comments загружаются batch-ом через DataLoader.
 
@@ -31,7 +31,6 @@ mutation {
     body: "First post"
   }) {
     id
-    userId
     body
     commentsEnabled
     createdAt
@@ -39,6 +38,11 @@ mutation {
   }
 }
 ```
+Headers:
+{
+"user-id": "47c52a73-c599-4c34-86cb-4969bfc0e730"
+}
+
 
 Пример ответа:
 
@@ -46,12 +50,11 @@ mutation {
 {
   "data": {
     "createPost": {
-      "id": "019c1cd4-3b54-7a22-80b9-2fd5f88c83de",
-      "userId": "019c1cd4-1da1-7be6-8f7c-d4c0847527fd",
-      "body": "First post",
+      "id": "01a1110a-68b1-7889-a0bf-b249757cd581",
+      "body": "Hello in docker!",
       "commentsEnabled": true,
-      "createdAt": "2026-09-21T11:00:00Z",
-      "updatedAt": "2026-09-21T11:00:00Z"
+      "createdAt": "2026-10-06T11:47:37Z",
+      "updatedAt": "2026-10-06T11:47:37Z"
     }
   }
 }
@@ -66,18 +69,23 @@ Root comment создаётся без `parentId`.
 ```graphql
 mutation {
   createComment(input: {
-    postId: "019c1cd4-3b54-7a22-80b9-2fd5f88c83de"
-    body: "Hello world!"
+    postId: "01a1110a-68b1-7889-a0bf-b249757cd581"
+    body: "Root comment!"
   }) {
     id
     postId
     parentId
-    userId
     body
     createdAt
   }
 }
 ```
+
+Headers:
+{
+"user-id": "47c52a73-c599-4c34-86cb-4969bfc0e730"
+}
+
 Пример ответа:
 ```json
 {
@@ -86,8 +94,7 @@ mutation {
       "id": "019c1cd4-5b31-7564-b5ea-7ccf9207619a",
       "postId": "019c1cd4-3b54-7a22-80b9-2fd5f88c83de",
       "parentId": null,
-      "userId": "019c1cd4-1da1-7be6-8f7c-d4c0847527fd",
-      "body": "Hello world!",
+      "body": "Root comment!",
       "createdAt": "2026-09-21T11:01:00Z"
     }
   }
@@ -98,14 +105,37 @@ mutation {
 
 ```graphql
 query {
-  posts(limit: 20) {
-    id
-    userId
-    body
-    createdAt
+  posts(first: 50) {
+    nodes {
+      id
+      userId
+      body
+      commentsEnabled
+      comments(first: 20) {
+        nodes {
+          id
+          body
+          replies(first: 20) {
+            nodes {
+              id
+              body
+            }
+          }
+        }
+      }
+      createdAt
+      updatedAt
+    }
+    nextCursor
   }
 }
 ```
+
+Headers:
+{
+"user-id": "47c52a73-c599-4c34-86cb-4969bfc0e730"
+}
+
 ## Batch-загрузка comments
 
 Запрос posts с вложенным полем `comments` потенциально создаёт N+1 проблему
@@ -114,58 +144,28 @@ query {
 
 ```graphql
 query {
-  posts(limit: 3) {
-    id
-    body
-
-    comments(limit: 2) {
+  posts(first: 50) {
+    nodes {
       id
       userId
       body
-      createdAt
-    }
-  }
-}
-```
-
-Пример результата:
-
-```json
-{
-  "data": {
-    "posts": [
-      {
-        "id": "019c1cd4-3b54-7a22-80b9-2fd5f88c83de",
-        "body": "Первый post",
-        "createdAt": "2026-09-21T11:00:00Z",
-        "comments": [
-          {
-            "id": "019c1cd4-5b31-7564-b5ea-7ccf9207619a",
-            "userId": "019c1cd4-1da1-7be6-8f7c-d4c0847527fd",
-            "body": "Первый root comment",
-            "createdAt": "2026-09-21T11:01:00Z"
+      commentsEnabled
+      comments(first: 20) {
+        nodes {
+          id
+          body
+          replies(first: 20) {
+            nodes {
+              id
+              body
+            }
           }
-        ]
+        }
       }
-    ]
-  }
-}
-```
-
-### Получение replies комментария
-
-```graphql
-query {
-  comment(id: "019c1cd4-5b31-7564-b5ea-7ccf9207619a") {
-    id
-    body
-
-    replies(limit: 20) {
-      id
-      userId
-      body
       createdAt
+      updatedAt
     }
+    nextCursor
   }
 }
 ```
@@ -174,7 +174,7 @@ query {
 ```graphql
 mutation {
   updatePostCommentsEnabled(input: {
-    postId: "019c1cd4-3b54-7a22-80b9-2fd5f88c83de"
+    postId: "01a1110a-68b1-7889-a0bf-b249757cd581"
     commentsEnabled: false
   }) {
     id
@@ -203,9 +203,6 @@ cp .env.example .env
 `.env.example`:
 
 ```env
-# Хранилище: inmemory или psql
-STORAGE_TYPE=inmemory
-
 # Порт приложения на хосте
 APP_PORT=8080
 
@@ -225,7 +222,7 @@ docker compose up --build
 **PostgreSQL режим** (поднимается контейнер с базой):
 
 ```bash
-docker compose --profile psql up --build
+STORAGE_TYPE=psql docker compose --profile psql up --build
 ```
 
 Приложение будет доступно по адресу `http://localhost:${APP_PORT}` (по
@@ -249,20 +246,14 @@ JDBC URL для IntelliJ IDEA:
 ```
 jdbc:postgresql://localhost:5433/posts
 ```
-
-
 ### 5. Остановка
-
 ```bash
 docker compose down
 ```
-
 С удалением данных:
-
 ```bash
 docker compose down -v
 ```
-
 ## Переменные окружения
 
 | Переменная | По умолчанию | Описание |
@@ -279,25 +270,14 @@ docker compose down -v
 
 ```bash
 # In-memory
-STORAGE_TYPE=inmemory go run ./cmd/postfeed
+go run cmd/main.go
 
 # PostgreSQL (нужна запущенная база)
-STORAGE_TYPE=psql \
 POSTGRES_HOST=localhost \
 POSTGRES_PORT=5432 \
 POSTGRES_USER=app \
 POSTGRES_PASSWORD=secret \
 POSTGRES_DB=posts \
-go run ./cmd/postfeed
-```
 
-## Точки роста
- - Счётчики комментариев как метрика для кеширования и пагинации, а также показывать количество комментариев к посту сразу
-Хранить `comments_count` прямо в `posts`
- - Разделить `title` и `body`, чтобы использовать NoSQL-хранилище, грузить заголовок и начало поста для ленты, для индексации
- - Кеширование популярных постов для увеличения скорости и уменьшения нагрузки
- - Полнотекстовый поиск по постам (`tsvector`)
- - Rate limiting на создание постов и комментариев.
- - Асинхронная обработка (очередь на создание комментария)
- - Метрики и трейсинг (Prometheus + OpenTelemetry) для
-  наблюдаемости
+STORAGE_TYPE=psql DATABASE_URL="postgres://app:secret@localhost:5433/posts?sslmode=disable" go run cmd/main.go 
+```
