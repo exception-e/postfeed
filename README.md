@@ -31,7 +31,7 @@ Reply-комментарии не входят в выдачу comments: кор�
 erDiagram
     USERS ||--o{ POSTS : user
     USERS ||--o{ COMMENTS : user
-    POSTS ||--o{ COMMENTS : 
+    POSTS ||--o{ COMMENTS : has
     COMMENTS ||--o{ COMMENTS : replies
 
     POSTS {
