@@ -34,6 +34,7 @@ import (
 
 const (
 	shutdownTimeout = 5 * time.Second
+	defaultPort     = "8080"
 )
 
 func main() {
@@ -140,7 +141,7 @@ func main() {
 	)
 
 	srv := &http.Server{
-		Addr:              ":" + cfg.ServerPort,
+		Addr:              ":" + defaultPort,
 		Handler:           srvMux,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
