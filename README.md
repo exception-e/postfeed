@@ -23,14 +23,15 @@ Reply-комментарии не входят в выдачу comments: кор�
 
 Запрос вида `posts { comments(limit: 3) }` выполняет одну batch-загрузку root comments для всех posts из текущей страницы, а не отдельный SQL-запрос для каждого post.
 
-Предполагается, что userId передан из сервиса авторизации
+Предполагается, что userId передан из сервиса авторизации, не хранится в базе, `user-id` передается в headers
+
+GraphQL endpoint: `POST /query`
+GraphQL Playground: `GET /playground`
 
 ## Схема данных
 
 ```mermaid
 erDiagram
-    USERS ||--o{ POSTS : user
-    USERS ||--o{ COMMENTS : user
     POSTS ||--o{ COMMENTS : has
     COMMENTS ||--o{ COMMENTS : replies
 
@@ -51,6 +52,8 @@ erDiagram
         timestamp created_at
     }
 ```
+
+Целостность обеспечивается составным внешним ключом `(post_id, parent_id) → comments(post_id, id)`, ответ не может ссылаться на комментарий из другого поста.
 
 ## Иерархия комментариев
 
