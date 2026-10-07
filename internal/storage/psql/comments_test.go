@@ -98,6 +98,7 @@ func TestStorage_CreateComment(t *testing.T) {
 	})
 }
 func TestStorage_CommentCursor(t *testing.T) {
+	cleanupDB(t)
 	ctx := t.Context()
 	s := NewStorage(testDB, slog.New(tests.NewTestHandler(t)))
 

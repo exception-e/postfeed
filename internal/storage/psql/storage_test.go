@@ -13,6 +13,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -94,4 +95,11 @@ func runMigrations(db *sql.DB) error { //TODO с миграциями
 	}
 
 	return nil
+}
+
+func cleanupDB(t *testing.T) {
+	t.Helper()
+	_, err := testDB.ExecContext(context.Background(),
+		"TRUNCATE posts, comments RESTART IDENTITY CASCADE")
+	require.NoError(t, err)
 }

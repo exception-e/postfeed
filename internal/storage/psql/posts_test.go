@@ -16,6 +16,7 @@ import (
 )
 
 func TestStorage_CreatePost(t *testing.T) {
+	cleanupDB(t)
 	ctx := t.Context()
 	s := NewStorage(testDB, slog.New(tests.NewTestHandler(t)))
 
@@ -114,6 +115,7 @@ func TestUpdatePost_NotFound(t *testing.T) {
 }
 
 func TestStorage_PostCursor(t *testing.T) {
+	cleanupDB(t)
 	ctx := t.Context()
 	s := NewStorage(testDB, slog.New(tests.NewTestHandler(t)))
 
