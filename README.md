@@ -1,8 +1,8 @@
 # PostFeed
 
-Мини-сервис для постов и комментариев с поддержкой двух хранилищ:
-in-memory и PostgreSQL. Выбор хранилища управляется переменной окружения
-`STORAGE_TYPE`.
+Мини-сервис для создания постов и комментариев с поддержкой двух хранилищ: in-memory и PostgreSQL и GraphQL api.
+
+Выбор хранилища управляется переменной окружения `STORAGE_TYPE`.
 
 ## Стек
 
@@ -12,16 +12,63 @@ in-memory и PostgreSQL. Выбор хранилища управляется п
 - Docker / Docker Compose
 
 ## API
-API позволяет получать posts и первые root comments для каждого поста.
-Reply-комментарии не входят в выдачу comments: root comment — это комментарий с parent_id = null.
+Сервис позволяет посмотреть список постов, пост и комментарии к нему, запретить комментарии к своему посту.
+API позволяет получать список постов и первые/корневые комментарии для каждого поста.
 
-Комментарии упорядочены по id ASC. В качестве id используется UUIDv7, такой порядок, с некоторым приближением, соответствует порядку создания.
+Reply-комментарии не входят в выдачу comments: корневой комментарий — это комментарий с parent_id = null.
+
+Комментарии организованы иерархически и упорядочены по id ASC. В качестве id используется UUIDv7, такой порядок, с некоторым приближением, соответствует порядку создания.
 
 Для устранения N+1 запросов comments загружаются batch-ом через DataLoader.
 
 Запрос вида `posts { comments(limit: 3) }` выполняет одну batch-загрузку root comments для всех posts из текущей страницы, а не отдельный SQL-запрос для каждого post.
 
-В текущей реализации totalCount не работают
+Предполагается, что userId передан из сервиса авторизации
+
+## Схема данных
+
+```mermaid
+erDiagram
+    USERS ||--o{ POSTS : user
+    USERS ||--o{ COMMENTS : user
+    POSTS ||--o{ COMMENTS : 
+    COMMENTS ||--o{ COMMENTS : replies
+
+    POSTS {
+        uuid id PK
+        uuid user_id 
+        text body
+        boolean comments_enabled
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    COMMENTS {
+        uuid id PK
+        uuid user_id
+        uuid post_id FK
+        uuid parent_id FK "nullable"
+        text body
+        timestamp created_at
+    }
+```
+
+## Иерархия комментариев
+
+```mermaid
+graph TD
+    P[Post]
+    C1[Comment 1<br/>parent_id = null]
+    C2[Comment 2<br/>parent_id = null]
+    R1[Reply 1<br/>parent_id = C1]
+    R2[Reply 2<br/>parent_id = C1]
+    R3[Reply 3<br/>parent_id = R1]
+
+    P --> C1
+    P --> C2
+    C1 --> R1
+    C1 --> R2
+    R1 --> R3
+```
 
 ## Создание post
 
@@ -38,11 +85,13 @@ mutation {
   }
 }
 ```
-Headers:
-{
-"user-id": "47c52a73-c599-4c34-86cb-4969bfc0e730"
-}
 
+Headers:
+```json
+{
+  "user-id": "47c52a73-c599-4c34-86cb-4969bfc0e730"
+}
+```
 
 Пример ответа:
 
@@ -82,9 +131,11 @@ mutation {
 ```
 
 Headers:
+```json
 {
 "user-id": "47c52a73-c599-4c34-86cb-4969bfc0e730"
 }
+```
 
 Пример ответа:
 ```json
@@ -132,10 +183,11 @@ query {
 ```
 
 Headers:
+```json
 {
 "user-id": "47c52a73-c599-4c34-86cb-4969bfc0e730"
 }
-
+```
 ## Batch-загрузка comments
 
 Запрос posts с вложенным полем `comments` потенциально создаёт N+1 проблему
@@ -169,6 +221,26 @@ query {
   }
 }
 ```
+
+## DataLoader
+
+```mermaid
+sequenceDiagram
+participant C as Client
+participant G as GraphQL
+participant D as DataLoader
+participant DB as PostgreSQL
+
+    C->>G: posts { comments(limit: 3) }
+    G->>DB: SELECT posts
+    DB-->>G: posts
+    G->>D: load comments for post_ids
+    D->>DB: SELECT comments WHERE post_id IN (...)
+    DB-->>D: comments
+    D-->>G: batched
+    G-->>C: response
+```
+
 ## Изменение commentsEnabled
 
 ```graphql
@@ -188,7 +260,7 @@ mutation {
 ### 1. Клонировать репозиторий
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/exception-e/postfeed
 cd postfeed
 ```
 
@@ -261,11 +333,11 @@ docker compose down -v
 | `STORAGE_TYPE` | `inmemory` | `inmemory` или `psql` |
 | `APP_PORT` | `8080` | Порт приложения на хосте |
 | `POSTGRES_HOST` | `postgres` | Хост базы (задаётся в compose) |
-| `POSTGRES_PORT` | `5432` | Порт базы внутри compose-сети |
 | `POSTGRES_USER` | `app` | Пользователь базы |
 | `POSTGRES_PASSWORD` | `secret` | Пароль |
 | `POSTGRES_DB` | `posts` | Имя базы |
 
+STORAGE_TYPE передается в командной строке при запуске для psql версии, по умолчанию STORAGE_TYPE=inmemory 
 ## Запуск без Docker
 
 ```bash
@@ -274,7 +346,7 @@ go run cmd/main.go
 
 # PostgreSQL (нужна запущенная база)
 POSTGRES_HOST=localhost \
-POSTGRES_PORT=5432 \
+POSTGRES_PORT=5433 \
 POSTGRES_USER=app \
 POSTGRES_PASSWORD=secret \
 POSTGRES_DB=posts \

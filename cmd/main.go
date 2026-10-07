@@ -37,21 +37,25 @@ const (
 )
 
 func main() {
+	// Init logger
 	logHandler := slog.NewJSONHandler(
 		os.Stdout,
 		&slog.HandlerOptions{Level: slog.LevelDebug},
 	)
 	log := logger.New(logHandler)
 
+	// Load config
 	if err := godotenv.Load(); err != nil {
 		log.Info("No .env, use provided environment variables")
 	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Error("Failed to config.Load", "error", err)
 		os.Exit(1)
 	}
 
+	// Init storage
 	var postsRepo storageTypes.PostRepo
 	var commentsRepo storageTypes.CommentRepo
 	switch cfg.StorageType {
@@ -79,10 +83,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Init services
 	postsService := posts.NewService(postsRepo)
 	commentsService := comments.NewService(postsService, commentsRepo)
 	pubsubService := pubsub.NewMemory(log.WithGroup("pubsub"))
 
+	// Init server
 	gqpSrv := handler.New(
 		graph.NewExecutableSchema(
 			graph.Config{
@@ -134,7 +140,7 @@ func main() {
 	)
 
 	srv := &http.Server{
-		Addr:              ":" + os.Getenv("APP_PORT"),
+		Addr:              ":" + cfg.ServerPort,
 		Handler:           srvMux,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
@@ -142,6 +148,7 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
+	// Start server
 	signalCtx, signalCtxCancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer signalCtxCancel()
 

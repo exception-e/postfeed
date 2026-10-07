@@ -14,12 +14,14 @@ const (
 )
 
 type Config struct {
+	ServerPort  string
 	StorageType string
 	Storage     psql.Config
 }
 
 func Load() (*Config, error) {
 	cfg := &Config{
+		ServerPort:  getEnv("APP_PORT", "8080"),
 		StorageType: getEnv("STORAGE_TYPE", StorageTypeInMemory),
 		Storage:     loadStorageConfig(),
 	}
