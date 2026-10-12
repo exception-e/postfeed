@@ -42,7 +42,7 @@ type Comment {
     """
     Дочерние комментарии конкретного узла.
     Поддерживает сколько угодно уровней:
-    comment.replies.edges.node.replies...
+    comment.replies.node.replies...
     """
     replies(first: Int = 20, after: Cursor): CommentConnection!
 

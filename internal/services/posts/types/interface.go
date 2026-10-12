@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
+//go:generate mockgen -source=interface.go -destination=../../mocks/mockPostsService.go -package=mocks
+
 type PostsService interface {
 	CreatePost(ctx context.Context, input CreatePostInput) (uuid.UUID, error)
 	SetCommentsEnabled(ctx context.Context, postID, userID uuid.UUID, enabled bool) error

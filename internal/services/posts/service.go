@@ -11,8 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-//go:generate	mockgen -source=./internal/services/posts/types/interface.go -destination=./internal/services/mocks/mockPostsService.go -package=mocks
-
 var _ types.PostsService = (*Service)(nil)
 
 type Service struct {

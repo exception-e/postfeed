@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 
@@ -33,7 +35,16 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		userIDRaw := r.Header.Get(userIDHeader)
-		if strings.TrimSpace(userIDRaw) == "" {
+		userIDRaw = strings.TrimSpace(userIDRaw)
+		if userIDRaw == "" {
+			// Разрешаем introspection без авторизации, но блокируем всё остальное
+			body, _ := io.ReadAll(r.Body)
+			r.Body = io.NopCloser(bytes.NewReader(body))
+			if bytes.Contains(body, []byte("__schema")) || bytes.Contains(body, []byte("__type")) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			errorResponse("UserID must be provided")
 			return
 		}

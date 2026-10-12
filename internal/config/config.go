@@ -27,7 +27,7 @@ func Load() (*Config, error) {
 	}
 
 	if cfg.Storage.DSN == "" {
-		return nil, fmt.Errorf("DATABASE_DSN is required")
+		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
 
 	return cfg, nil

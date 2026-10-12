@@ -38,7 +38,7 @@ func (s *CommentStorage) CreateComment(ctx context.Context, comment domain.Comme
 		}
 	}
 
-	if comment.ParentID.Valid {
+	if comment.ParentID.Valid && s.comments[comment.ParentID.UUID].PostID == comment.PostID {
 		s.mu.RLock()
 		_, ok := s.comments[comment.ParentID.UUID]
 		s.mu.RUnlock()

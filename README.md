@@ -21,9 +21,9 @@ Reply-комментарии не входят в выдачу comments: кор�
 
 Для устранения N+1 запросов comments загружаются batch-ом через DataLoader.
 
-Запрос вида `posts { comments(limit: 3) }` выполняет одну batch-загрузку root comments для всех posts из текущей страницы, а не отдельный SQL-запрос для каждого post.
+Запрос вида `posts { comments(first: 3) }` выполняет одну batch-загрузку root comments для всех posts из текущей страницы, а не отдельный SQL-запрос для каждого post.
 
-Предполагается, что userId передан из сервиса авторизации, не хранится в базе, `user-id` передается в headers
+Предполагается, что userId передан из сервиса авторизации, таблица пользователей не хранится в базе, `user-id` передается в headers
 
 GraphQL endpoint: `POST /query`
 GraphQL Playground: `GET /playground`
@@ -49,7 +49,7 @@ erDiagram
         uuid post_id FK
         uuid parent_id FK "nullable"
         text body
-        timestamp created_at
+        timestamptz created_at
     }
 ```
 
@@ -195,7 +195,7 @@ Headers:
 
 Запрос posts с вложенным полем `comments` потенциально создаёт N+1 проблему
 
-Для устранения N+1 используется DataLoader. Все обращения к `comments(limit: N)` в рамках одного GraphQL-request объединяются в batch-запрос.
+Для устранения N+1 используется DataLoader. Все обращения к `comments(first: N)` в рамках одного GraphQL-request объединяются в batch-запрос.
 
 ```graphql
 query {
@@ -234,7 +234,7 @@ participant G as GraphQL
 participant D as DataLoader
 participant DB as PostgreSQL
 
-    C->>G: posts { comments(limit: 3) }
+    C->>G: posts { comments(first: 3) }
     G->>DB: SELECT posts
     DB-->>G: posts
     G->>D: load comments for post_ids
@@ -248,10 +248,10 @@ participant DB as PostgreSQL
 
 ```graphql
 mutation {
-  updatePostCommentsEnabled(input: {
+  updatePostCommentsEnabled(
     postId: "01a1110a-68b1-7889-a0bf-b249757cd581"
     commentsEnabled: false
-  }) {
+  ) {
     id
     commentsEnabled
     updatedAt

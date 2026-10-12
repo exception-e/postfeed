@@ -1,7 +1,9 @@
+//go:build integration
+// +build integration
+
 package psql
 
 import (
-	"fmt"
 	"log/slog"
 	"postfeed/internal/domain"
 	"postfeed/internal/storage/types"
@@ -85,9 +87,7 @@ func TestUpdatePost_CommentsEnabledFalse(t *testing.T) {
 		CommentsEnabled: false,
 	}
 	id, err := s.CreatePost(ctx, post)
-	if err != nil {
-		fmt.Errorf("inserting post: %w", err)
-	}
+	require.NoError(t, err)
 	enabled := false
 
 	err = s.UpdatePost(ctx, types.PostUpdateInput{

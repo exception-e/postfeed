@@ -50,7 +50,7 @@ func (s *Service) CreateComment(ctx context.Context, input types.CreateCommentIn
 		PostID:   input.PostID,
 		ParentID: input.ParentID,
 		UserID:   input.UserID,
-		Body:     input.Body,
+		Body:     body,
 	}
 
 	id, err := s.repo.CreateComment(ctx, comment)
