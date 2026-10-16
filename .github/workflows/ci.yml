@@ -1,0 +1,83 @@
+name: CI/CD with Docker
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Dependencies
+        run: go mod download
+
+      - name: Run Go Vet (Linter)
+        run: go vet ./...
+
+      - name: Test
+        run: go test -v ./...
+
+  docker:
+    name: Docker
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        run: docker build -t postfeed:local .
+
+      - name: Start Docker Container
+        run: |
+            docker run -d \
+              --name app-container \
+              -p 8081:8080 \
+              postfeed:local
+
+      - name: Wait for initialization
+        run: sleep 5
+
+      - name: Check Container Status
+        run: |
+            STATUS=$(docker inspect -f '{{.State.Running}}' app-container)
+            if [ "$STATUS" != "true" ]; then
+            echo "Container failed"
+            docker logs app-container
+            exit 1
+            fi
+            echo "Container started"
+
+      - name: Verify Logs for Errors
+        run: |
+                LOGS=$(docker logs app-container)
+                echo "--- Container logs ---"
+                echo "$LOGS"
+                echo "------------------------------"
+                
+                if echo "$LOGS" | grep -Ei "panic|fatal|([0-9T:-]+ .*ERROR)"; then
+                  echo "Critical errors in logs"
+                  exit 1
+                fi
+                echo "No errors"
+
+      - name: Cleanup
+        if: always()
+        run: |
+            docker stop app-container || true
+            docker rm app-container || true
