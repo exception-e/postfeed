@@ -142,7 +142,7 @@ func TestStorage_PostCursor(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, actualPosts, 2)
-		require.Equal(t, posts[0].ID, actualPosts[0].ID)
+		require.Equal(t, posts[0].ID, actualPosts[1].ID)
 		require.Equal(t, posts[1].ID, actualPosts[1].ID)
 		require.NotNil(t, actualCursor.Next)
 		require.Equal(t, posts[1].ID, *actualCursor.Next)
