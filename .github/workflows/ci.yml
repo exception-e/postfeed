@@ -70,7 +70,7 @@ jobs:
                       --write-out '%{http_code}' \
                       --connect-timeout 1 \
                       --max-time 2 \
-                      http://127.0.0.1:8081/playground); then
+                      http://127.0.0.0:8081/playground); then
                       if [[ "$status" == "200" ]]; then
                         echo "Application is ready"
                         exit 0
