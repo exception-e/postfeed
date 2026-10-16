@@ -5,6 +5,13 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
 
   test:
@@ -17,24 +24,18 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.26'
-          cache: true
-
-      - name: Dependencies
-        run: go mod download
 
       - name: Run Go Vet
         run: go vet ./...
 
       - name: Test
-        run: go test -v ./...
+        run: go test -v -tags=integration -count=1 -timeout=10m ./...
 
   docker:
     name: Docker
     needs: test
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -43,38 +44,50 @@ jobs:
       - name: Build Docker Image
         run: docker build -t postfeed:local .
 
-      - name: Start Docker Container
+      - name: Start container
         run: |
             docker run -d \
               --name app-container \
-              -p 8081:8080 \
+              -p 127.0.0.0:8081:8080 \
               postfeed:local
 
       - name: Wait for initialization
-        run: sleep 5
-
-      - name: Check Container Status
+        shell: bash
         run: |
-            STATUS=$(docker inspect -f '{{.State.Running}}' app-container)
-            if [ "$STATUS" != "true" ]; then
-            echo "Container failed"
-            docker logs app-container
-            exit 1
-            fi
-            echo "Container started"
-
-      - name: Verify Logs for Errors
-        run: |
-                LOGS=$(docker logs app-container)
-                echo "--- Container logs ---"
-                echo "$LOGS"
-                echo "------------------------------"
-                
-                if echo "$LOGS" | grep -Ei "panic|fatal|([0-9T:-]+ .*ERROR)"; then
-                  echo "Critical errors in logs"
+                  deadline=$((SECONDS + 60))
+                  
+                  while (( SECONDS < deadline )); do
+                    running=$(docker inspect \
+                      --format '{{.State.Running}}' app-container)
+                  
+                    if [[ "$running" != "true" ]]; then
+                      echo "Container exited before becoming ready"
+                      exit 1
+                    fi
+                  
+                    if status=$(curl --silent --show-error \
+                      --output /dev/null \
+                      --write-out '%{http_code}' \
+                      --connect-timeout 1 \
+                      --max-time 2 \
+                      http://127.0.0.1:8081/playground); then
+                      if [[ "$status" == "200" ]]; then
+                        echo "Application is ready"
+                        exit 0
+                      fi
+                    fi
+                  
+                    sleep 1
+                  done
+                  
+                  echo "Application did not become ready within timeout"
                   exit 1
-                fi
-                echo "No errors"
+
+      - name: Show container diagnostics
+        if: always()
+        run: |
+          docker inspect --format '{{json .State}}' app-container || true
+          docker logs --timestamps app-container 2>&1 || true
 
       - name: Cleanup
         if: always()
