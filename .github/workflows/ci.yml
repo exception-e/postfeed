@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.3.0
+        uses: actions/checkout@v5
 
       - name: Set up
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.26'
 
@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.3.0
+        uses: actions/checkout@v5
 
       - name: Build Docker Image
         run: docker build -t postfeed:local .
@@ -94,3 +94,62 @@ jobs:
         run: |
             docker stop app-container || true
             docker rm app-container || true
+
+  postgres:
+    name: Application with PostgreSQL
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+
+    env:
+      STORAGE_TYPE: psql
+      GRAPHQL_URL: http://127.0.0.0:8081/query
+      TEST_USER_ID: 47c52a73-c599-4c34-86cb-4969bfc0e730
+
+    steps:
+        - name: Checkout
+          uses: actions/checkout@v5
+
+        - name: Prepare CI environment
+          shell: bash
+          run: |
+              cat > .env <<'EOF'
+              APP_PORT=8081
+              
+              POSTGRES_USER=app
+              POSTGRES_PASSWORD=ci_password
+              POSTGRES_DB=posts
+              
+              DATABASE_URL=postgres://app:ci_password@postgres:5432/posts?sslmode=disable
+              
+              DATABASE_MAX_OPEN_CONNS=25
+              DATABASE_MAX_IDLE_CONNS=25
+              DATABASE_CONN_MAX_LIFETIME=5m
+              EOF
+
+        - name: Start application and PostgreSQL
+          run: |
+                  docker compose --profile psql up \
+                    --build \
+                    --wait \
+                    --wait-timeout 120
+
+        #- name: Check PostgreSQL through GraphQL
+        # run: bash scripts/ci/check-postgres-api.sh
+
+        - name: Show diagnostics
+          if: always()
+          run: |
+                  docker compose --profile psql ps --all || true
+                  docker compose --profile psql logs \
+                    --no-color --timestamps || true
+
+        - name: Cleanup
+          if: always()
+          run: |
+                  docker compose --profile psql down \
+                    --volumes \
+                    --remove-orphans
