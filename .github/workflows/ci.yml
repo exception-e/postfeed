@@ -137,8 +137,8 @@ jobs:
                     --wait \
                     --wait-timeout 120
 
-        #- name: Check PostgreSQL through GraphQL
-        # run: bash scripts/ci/check-postgres-api.sh
+        - name: Check PostgreSQL through GraphQL
+          run: bash scripts/ci/check-postgres-api.sh
 
         - name: Show diagnostics
           if: always()
